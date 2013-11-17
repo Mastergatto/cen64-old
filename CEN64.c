@@ -54,10 +54,10 @@ static void WindowResizeCallback(int width, int height);
 #endif
 
 /* ============================================================================
- *  CreateWindow: Creates an OpenGL window.
+ *  CreateGLWindow: Creates an OpenGL window.
  * ========================================================================= */
 static int
-CreateWindow(void** window, bool fullscreen) {
+CreateGLWindow(void** window, bool fullscreen) {
 #ifdef GLFW3
   GLFWwindow myWindow;
   glfwWindowHint(GLFW_RESIZABLE, GL_TRUE);
@@ -94,9 +94,9 @@ CreateWindow(void** window, bool fullscreen) {
 }
 
 /* ============================================================================
- *  DestroyWindow: Tears down the OpenGL window.
+ *  DestroyGLWindow: Tears down the OpenGL window.
  * ========================================================================= */
-static void DestroyWindow(void *window) {
+static void DestroyGLWindow(void *window) {
 #ifdef GLFW3
   glfwDestroyWindow((GLFWwindow*) window);
 #else
@@ -220,7 +220,7 @@ DestroyResources(struct CEN64Device *device, void *window, int sfd, int cfd) {
     DestroyDevice(device);
 
   if (window != NULL)
-  DestroyWindow(window);
+  DestroyGLWindow(window);
 
   if (cfd >= 0)
     CloseEventManagerHandle(cfd);
@@ -301,7 +301,7 @@ int main(int argc, const char *argv[]) {
 #ifdef _WIN32
   if (WSAStartup(MAKEWORD(1, 1), &wsaData) != 0) {
     printf("Failed to initialize WinSock.\n");
-    DestroyResources(NULL, NULL, -1);
+    DestroyResources(NULL, NULL, -1, -1);
     return 1;
   }
 #endif
@@ -312,7 +312,7 @@ int main(int argc, const char *argv[]) {
     return 2;
   }
 
-  if (CreateWindow(&window, false) < 0) {
+  if (CreateGLWindow(&window, false) < 0) {
     printf("Failed to open a GLFW window.\n");
     DestroyResources(NULL, NULL, -1, -1);
     return 2;

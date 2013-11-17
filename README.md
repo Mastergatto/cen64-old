@@ -73,11 +73,9 @@ Next, issue a build command:
   * You will need to download the latest version of `mingw64`, [here](http://sourceforge.net/projects/mingwbuilds/files/latest/download).
     * Make sure that it installs the x64 compiler, not the x86 one!
   * After installation, update your system path so that it includes the `mingw64\bin` directory.
-  * You will also need to obtain GLFW2 libraries and headers, [here](http://sourceforge.net/projects/glfw/files/glfw/2.7.9/glfw-2.7.9.bin.WIN64.zip/download).
-    * Place the `include` directory and `lib-mingw/libglfw.a` file in the top-level (CEN64) directory.
-  * Lastly, you will need OpenAL libraries and headers, [here](http://kcat.strangesoft.net/openal.html#download).
-    * Place the `include` directory and `lib/Win64/libOpenAL32.dll.a` file in the top-level (CEN64) directory.
-    * Copy the `soft_oal.dll` to the same directory as `cen64.exe` and rename it to `OpenAL32.dll`. This file _must_ remain in the same directory as the `cen64.exe` file; keep this in mind if you redistribute the binary!
+  * You will need to download some precompiled-libraries prior to building, [here](http://wwww.cen64.com/windows-binaries.zip).
+    * Extract and place the files into their respective directories.
+    * Note: `OpenAL32.dll`  _must_ remain in the same directory as the `cen64.exe` file; keep this in mind if you redistribute the binary!
 
 # Running
 

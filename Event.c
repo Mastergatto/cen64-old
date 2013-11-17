@@ -8,6 +8,12 @@
  *  This file is subject to the terms and conditions defined in
  *  file 'LICENSE', which is part of this source code package.
  * ========================================================================= */
+#ifdef _WIN32
+#include <winsock2.h>
+#include <WS2tcpip.h>
+#include <winsock.h>
+#endif
+
 #include "Common.h"
 #include "Event.h"
 
@@ -19,9 +25,7 @@
 #include <string.h>
 #endif
 
-#ifdef _WIN32
-#include <winsock.h>
-#else
+#ifndef _WIN32
 #include <netdb.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
@@ -44,11 +48,10 @@ void CleanupEventManager(int sfd) {
  *  CloseEventManagerHandle: Shuts down a connected handle and releases it.
  * ========================================================================= */
 void CloseEventManagerHandle(int cfd) {
-  shutdown(cfd, SHUT_RDWR);
-
 #ifdef _WIN32
   closesocket(cfd);
 #else
+  shutdown(cfd, SHUT_RDWR);
   close(cfd);
 #endif
 }
