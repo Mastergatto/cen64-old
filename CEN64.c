@@ -216,9 +216,14 @@ SignalHandler(int sig) {
  * ========================================================================= */
 static void
 DestroyResources(struct CEN64Device *device, void *window, int sfd) {
-  DestroyDevice(device);
+  if (device != NULL)
+    DestroyDevice(device);
+
+  if (window != NULL)
   DestroyWindow(window);
-  CleanupEventManager(sfd);
+
+  if (sfd != -1)
+    CleanupEventManager(sfd);
 
 #ifdef WINDOWS_BUILD
   WSACleanup();
@@ -289,44 +294,41 @@ int main(int argc, const char *argv[]) {
     return 0;
   }
 
+#ifdef WINDOWS_BUILD
+  if (WSAStartup(MAKEWORD(1, 1), &wsaData) != 0) {
+    printf("Failed to initialize WinSock.\n");
+    DestroyResources(NULL, NULL, -1);
+    return 1;
+  }
+#endif
+
   /* Kick off a window and such. */
   if (glfwInit() != GL_TRUE) {
     printf("Failed to initialize GLFW.\n");
-    return 1;
+    return 2;
   }
 
   if (CreateWindow(&window, false) < 0) {
     printf("Failed to open a GLFW window.\n");
-    glfwTerminate();
-
-    return 1;
+    DestroyResources(NULL, NULL, -1);
+    return 2;
   }
 
   /* Parse command line arguments, build the console. */
   if ((device = CreateDevice(argv[argc - 2])) == NULL) {
     printf("Failed to create a device.\n");
-
-    DestroyWindow(window);
-    glfwTerminate();
-    return 2;
-  }
-
-#ifdef WINDOWS_BUILD
-  if (WSAStartup(MAKEWORD(1, 1), &wsaData) != 0) {
-    printf("Failed to initialize WinSock.\n");
-    DestroyResources(device, window, sfd);
+    DestroyResources(NULL, device, -1);
     return 3;
   }
-#endif
 
   if (ParseArgs(argc - 3, argv + 1, device, &port)) {
-    DestroyResources(device, window, sfd);
+    DestroyResources(device, window, -1);
     return 255;
   }
 
   if ((sfd = RegisterEventManager(port)) < 0) {
     printf("Failed to create a socket.\n");
-    DestroyResources(device, window, sfd);
+    DestroyResources(device, window, -1);
     return 4;
   }
 
