@@ -29,6 +29,8 @@
 #include <GL/glfw.h>
 #endif
 
+#include <signal.h>
+
 #ifdef GLFW3
 GLFWwindow *window;
 #endif
@@ -36,14 +38,169 @@ GLFWwindow *window;
 /* GLFW seems to like global state. */
 /* We'll jmp back into main at close. */
 static jmp_buf env;
+static int RequestShutdown(void);
+static void SignalHandler(int);
+
+#ifdef GLFW3
+static void WindowResizeCallback(void *window, int width, int height);
+#else
+static void WindowResizeCallback(int width, int height);
+#endif
 
 /* ============================================================================
- *  CloseRequested: GLFW requested a close; jump to saved environment.
+ *  CreateWindow: Creates an OpenGL window.
  * ========================================================================= */
 static int
-CloseRequested(void) {
+CreateWindow(void** window, bool fullscreen) {
+#ifdef GLFW3
+  GLFWwindow myWindow;
+  glfwWindowHint(GLFW_RESIZABLE, GL_TRUE);
+
+  glfwWindowHint(GLFW_RED_BITS, 5);
+  glfwWindowHint(GLFW_GREEN_BITS, 6);
+  glfwWindowHint(GLFW_BLUE_BITS, 5);
+  glfwWindowHint(GLFW_ALPHA_BITS, 0);
+  glfwWindowHint(GLFW_DEPTH_BITS, 8);
+  glfwWindowHint(GLFW_STENCIL_BITS, 0);
+
+  if ((myWindow = glfwCreateWindow(640, 480, "CEN64", NULL, NULL)) == NULL)
+    return -1;
+
+  glfwMakeContextCurrent(window);
+  glfwSetWindowCloseCallback(window, RequestShutdown);
+  glfwSetWindowSizeCallback(window, WindowResizeCallback);
+
+  memcpy(window, &myWindow, sizeof(myWindow));
+  SetVIFContext(device->vif, window);
+
+#else
+  glfwOpenWindowHint(GLFW_WINDOW_NO_RESIZE, GL_FALSE);
+  if (glfwOpenWindow(640, 480, 5, 6, 5, 0, 8, 0, GLFW_WINDOW) != GL_TRUE)
+    return -2;
+
+  glfwSetWindowTitle("CEN64");
+  glfwSetWindowCloseCallback(RequestShutdown);
+  glfwSetWindowSizeCallback(WindowResizeCallback);
+#endif
+
+  glfwPollEvents();
+  return 0;
+}
+
+/* ============================================================================
+ *  DestroyWindow: Tears down the OpenGL window.
+ * ========================================================================= */
+static void DestroyWindow(void *window) {
+#ifdef GLFW3
+  glfwDestroyWindow((GLFWwindow*) window);
+#else
+  glfwCloseWindow();
+#endif
+}
+
+/* ============================================================================
+ *  ParseArgs: Parses the argument list and performs actions.
+ * ========================================================================= */
+static int
+ParseArgs(int args, const char *argv[], struct CEN64Device *device, int *port) {
+  int i;
+
+  /* TODO: getops or something sensible. */
+  for (i = 0; i < args; i++) {
+    const char *arg = argv[i];
+
+    while (*arg == ' ');
+
+    /* Accept -, --, and / */
+    if (*arg == '-') {
+      arg++;
+
+      if (*arg == '-')
+        arg++;
+    }
+
+    else if (*arg == '/')
+      arg++;
+
+    /* Set Controller Type. */
+    if (!strcmp(arg, "controller")) {
+      if (++i >= args) {
+        printf("-controller: Missing argument; ignoring.\n");
+        continue;
+      }
+
+      SetControlType(device->pif, argv[i]);
+    }
+
+    /* Set backing EEPROM file. */
+    else if (!strcmp(arg, "eeprom")) {
+      if (++i >= args) {
+        printf("-eeprom: Missing argument; ignoring.\n");
+        continue;
+      }
+
+      SetEEPROMFile(device->pif, argv[i]);
+    }
+
+    /* Set the communications port. */
+    else if (!strcmp(arg, "port")) {
+      char *endptr;
+
+      long long int num = strtol(argv[++i], &endptr, 10);
+
+      if (*(argv[i]) == '\0' || *endptr != '\0') {
+        printf("-port: Needs a numeric argument.\n");
+        continue;
+      }
+
+      else if (num < 1 || num > 65535) {
+        printf("-port: Argument must be in range: 1..65535.\n");
+        continue;
+      }
+
+      *port = num;
+    }
+
+    /* Set backing SRAM file. */
+    else if (!strcmp(arg, "sram")) {
+      if (++i >= args) {
+        printf("-sram: Missing argument; ignoring.\n");
+        continue;
+      }
+
+      SetSRAMFile(device->rom, argv[i]);
+    }
+  }
+
+  return 0;
+}
+
+/* ============================================================================
+ *  RequestShutdown: Somebody told us to stop executing; bail out...
+ * ========================================================================= */
+static int
+RequestShutdown(void) {
   longjmp(env, 1);
   return 0;
+}
+
+/* ============================================================================
+ *  RunConsole: Executes the console until we get interrupted.
+ * ========================================================================= */
+static void
+RunConsole(struct CEN64Device *device) {
+  if (setjmp(env) == 0) {
+    while (1)
+      CycleDevice(device);
+  }
+}
+
+/* ============================================================================
+ *  SignalHandler: Called on SIGINT traps, calls RequestShutdown.
+ * ========================================================================= */
+static void
+SignalHandler(int sig) {
+  RequestShutdown();
 }
 
 /* ============================================================================
@@ -80,68 +237,13 @@ WindowResizeCallback(int width, int height) {
   glClear(GL_COLOR_BUFFER_BIT);
 }
 
-
-/* ============================================================================
- *  ParseArgs: Parses the argument list and performs actions.
- * ========================================================================= */
-static void
-ParseArgs(int args, const char *argv[], struct CEN64Device *device) {
-  int i;
-
-  /* TODO: getops or something sensible. */
-  for (i = 0; i < args; i++) {
-    const char *arg = argv[i];
-
-    while (*arg == ' ');
-
-    /* Accept -, --, and / */
-    if (*arg == '-') {
-      arg++;
-
-      if (*arg == '-')
-        arg++;
-    }
-
-    else if (*arg == '/')
-      arg++;
-
-    /* Set Controller Type. */
-    if (!strcmp(arg, "controller")) {
-      if (++i >= args) {
-        printf("-controller: Missing argument; ignoring.\n");
-        continue;
-      }
-
-      SetControlType(device->pif, argv[i]);
-    }
-
-    /* Set backing EEPROM file. */
-    if (!strcmp(arg, "eeprom")) {
-      if (++i >= args) {
-        printf("-eeprom: Missing argument; ignoring.\n");
-        continue;
-      }
-
-      SetEEPROMFile(device->pif, argv[i]);
-    }
-
-    /* Set backing SRAM file. */
-    if (!strcmp(arg, "sram")) {
-      if (++i >= args) {
-        printf("-sram: Missing argument; ignoring.\n");
-        continue;
-      }
-
-      SetSRAMFile(device->rom, argv[i]);
-    }
-  }
-}
-
 /* ============================================================================
  *  main: Parses arguments and kicks off the application.
  * ========================================================================= */
 int main(int argc, const char *argv[]) {
   struct CEN64Device *device;
+  void *window = NULL;
+  int sfd, port = 0;
 
   if (argc < 3) {
     printf(
@@ -149,6 +251,7 @@ int main(int argc, const char *argv[]) {
       "Options:\n"
       "  -controller [keyboard,mayflash64,retrolink,wiiu,x360]\n"
       "  -eeprom <file>\n"
+      "  -port <1..65535>\n"
       "  -sram <file>\n\n",
       argv[0]);
 
@@ -158,78 +261,53 @@ int main(int argc, const char *argv[]) {
     return 0;
   }
 
+  /* Kick off a window and such. */
   if (glfwInit() != GL_TRUE) {
     printf("Failed to initialize GLFW.\n");
-    return 255;
+    return 1;
   }
 
-#ifdef GLFW3
-  glfwWindowHint(GLFW_RESIZABLE, GL_TRUE);
-
-  glfwWindowHint(GLFW_RED_BITS, 5);
-  glfwWindowHint(GLFW_GREEN_BITS, 6);
-  glfwWindowHint(GLFW_BLUE_BITS, 5);
-  glfwWindowHint(GLFW_ALPHA_BITS, 0);
-  glfwWindowHint(GLFW_DEPTH_BITS, 8);
-  glfwWindowHint(GLFW_STENCIL_BITS, 0);
-
-  if ((window = glfwCreateWindow(640, 480, "CEN64", NULL, NULL)) == NULL) {
-    debug("Failed to open a GLFW window.");
-    glfwTerminate();
-    return 0;
-  }
-
-  glfwMakeContextCurrent(window);
-  glfwSetWindowCloseCallback(window, CloseRequested);
-  glfwSetWindowSizeCallback(window, WindowResizeCallback);
-#else
-  glfwOpenWindowHint(GLFW_WINDOW_NO_RESIZE, GL_FALSE);
-  if (glfwOpenWindow(640, 480, 5, 6, 5, 0, 8, 0, GLFW_WINDOW) != GL_TRUE) {
+  if (CreateWindow(&window, false) < 0) {
     printf("Failed to open a GLFW window.\n");
-
     glfwTerminate();
-    return 0;
+
+    return 1;
   }
 
-  glfwSetWindowTitle("CEN64");
-  glfwSetWindowCloseCallback(CloseRequested);
-  glfwSetWindowSizeCallback(WindowResizeCallback);
-#endif
-  glfwPollEvents();
-
+  /* Parse command line arguments, build the console. */
   if ((device = CreateDevice(argv[argc - 2])) == NULL) {
     printf("Failed to create a device.\n");
 
-#ifdef GLFW3
-    glfwDestroyWindow(window);
-    return 1;
+    DestroyWindow(window);
+    glfwTerminate();
+    return 2;
   }
 
-  SetVIFContext(device->vif, window);
-#else
-    glfwCloseWindow();
-    return 1;
+  signal(SIGINT, SignalHandler);
+
+  if (ParseArgs(argc - 3, argv + 1, device, &port)) {
+    DestroyDevice(device);
+    DestroyWindow(window);
+    glfwTerminate();
+
+    return 255;
   }
-#endif
 
   if (LoadCartridge(device, argv[argc - 1])) {
     printf("Failed to load the ROM.\n");
 
     DestroyDevice(device);
-    return 2;
+    DestroyWindow(window);
+    glfwTerminate();
+    return 3;
   }
 
-  /* Parse the argument list now that */
-  /* the console is ready for us. */
-  ParseArgs(argc - 3, argv + 1, device);
-
+  /* Main loop: check for work, execute. */
   debug("== Booting the Console ==");
 
-  if (setjmp(env) == 0) {
-    while (1)
-      CycleDevice(device);
-  }
+  RunConsole(device);
 
+  /* Print statistics, gracefully terminate. */
   debug("== Destroying the Console ==");
 
 #ifndef NDEBUG
@@ -238,13 +316,7 @@ int main(int argc, const char *argv[]) {
 #endif
 
   DestroyDevice(device);
-
-#ifdef GLFW3
-  glfwDestroyWindow(window);
-#else
-  glfwCloseWindow();
-#endif
-
+  DestroyWindow(window);
   glfwTerminate();
   return 0;
 }
