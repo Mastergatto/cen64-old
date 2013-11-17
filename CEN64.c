@@ -9,7 +9,9 @@
  *  file 'LICENSE', which is part of this source code package.
  * ========================================================================= */
 #include "CEN64.h"
+#include "Common.h"
 #include "Device.h"
+#include "Event.h"
 
 #ifdef __cplusplus
 #include <csetjmp>
@@ -27,6 +29,10 @@
 #include <GLFW/glfw3.h>
 #else
 #include <GL/glfw.h>
+#endif
+
+#ifdef WINDOWS_BUILD
+#include <winsock.h>
 #endif
 
 #include <signal.h>
@@ -189,6 +195,8 @@ RequestShutdown(void) {
  * ========================================================================= */
 static void
 RunConsole(struct CEN64Device *device) {
+  signal(SIGINT, SignalHandler);
+
   if (setjmp(env) == 0) {
     while (1)
       CycleDevice(device);
@@ -201,6 +209,22 @@ RunConsole(struct CEN64Device *device) {
 static void
 SignalHandler(int sig) {
   RequestShutdown();
+}
+
+/* ============================================================================
+ *  DestroyResources: Destroy any resources; call before exiting.
+ * ========================================================================= */
+static void
+DestroyResources(struct CEN64Device *device, void *window, int sfd) {
+  DestroyDevice(device);
+  DestroyWindow(window);
+  CleanupEventManager(sfd);
+
+#ifdef WINDOWS_BUILD
+  WSACleanup();
+#endif
+
+  glfwTerminate();
 }
 
 /* ============================================================================
@@ -242,8 +266,12 @@ WindowResizeCallback(int width, int height) {
  * ========================================================================= */
 int main(int argc, const char *argv[]) {
   struct CEN64Device *device;
+  int sfd = -1, port = 0;
   void *window = NULL;
-  int sfd, port = 0;
+
+#ifdef WINDOWS_BUILD
+  WSADATA wsaData;
+#endif
 
   if (argc < 3) {
     printf(
@@ -283,23 +311,29 @@ int main(int argc, const char *argv[]) {
     return 2;
   }
 
-  signal(SIGINT, SignalHandler);
+#ifdef WINDOWS_BUILD
+  if (WSAStartup(MAKEWORD(1, 1), &wsaData) != 0) {
+    printf("Failed to initialize WinSock.\n");
+    DestroyResources(device, window, sfd);
+    return 3;
+  }
+#endif
 
   if (ParseArgs(argc - 3, argv + 1, device, &port)) {
-    DestroyDevice(device);
-    DestroyWindow(window);
-    glfwTerminate();
-
+    DestroyResources(device, window, sfd);
     return 255;
+  }
+
+  if ((sfd = RegisterEventManager(port)) < 0) {
+    printf("Failed to create a socket.\n");
+    DestroyResources(device, window, sfd);
+    return 4;
   }
 
   if (LoadCartridge(device, argv[argc - 1])) {
     printf("Failed to load the ROM.\n");
-
-    DestroyDevice(device);
-    DestroyWindow(window);
-    glfwTerminate();
-    return 3;
+    DestroyResources(device, window, sfd);
+    return 5;
   }
 
   /* Main loop: check for work, execute. */
@@ -315,9 +349,7 @@ int main(int argc, const char *argv[]) {
   VR4300DumpStatistics(device->vr4300);
 #endif
 
-  DestroyDevice(device);
-  DestroyWindow(window);
-  glfwTerminate();
+  DestroyResources(device, window, sfd);
   return 0;
 }
 

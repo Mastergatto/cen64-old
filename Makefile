@@ -59,7 +59,11 @@ MKDIR=mkdir
 RM=del /q /s 1>NUL 2>NUL
 endif
 
-CEN64_FLAGS = 
+CEN64_FLAGS =
+ifeq ($(OS),windows)
+CEN64_FLAGS += -DWINDOWS_BUILD
+endif
+
 WARNINGS = -Wall -Wextra -pedantic -Wno-unused-parameter
 
 COMMON_CFLAGS = $(CEN64_FLAGS) $(WARNINGS) -std=c99 -march=native -I. -Iinclude
@@ -125,7 +129,7 @@ $(TARGET): $(OBJECTS) libaudio libbus libpif \
   librdp librdram librom librsp libvideo libvr4300
 	@$(ECHO) $(BLUE)Linking$(YELLOW): $(PURPLE)$@$(TEXTRESET)
 	@$(CC) $(CFLAGS) $(LDFLAGS) $(LIBDIRS) $(OBJECTS) $(LIBS) \
-    -L. -lglfw -lopengl32 -lOpenAL32.dll -o $@
+    -L. -lglfw -lopengl32 -lOpenAL32.dll -lws2_32 -o $@
 
 $(OBJECT_DIR)\\%.o: %.c %.h Common.h
 	@$(MAYBE) $(OBJECT_DIR) $(MKDIR) $(OBJECT_DIR)
