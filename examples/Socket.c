@@ -1,5 +1,5 @@
 /* ============================================================================
- *  Examples/SocketAPI.c: Socket API demonstration.
+ *  Examples/Socket.c: Socket API demonstration.
  *
  *  CEN64: Cycle-accurate, Efficient Nintendo 64 Simulator.
  *  Copyright (C) 2013, Tyler J. Stachecki.
