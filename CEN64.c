@@ -31,7 +31,7 @@
 #include <GL/glfw.h>
 #endif
 
-#ifdef WINDOWS_BUILD
+#ifdef _WIN32
 #include <winsock.h>
 #endif
 
@@ -228,7 +228,7 @@ DestroyResources(struct CEN64Device *device, void *window, int sfd, int cfd) {
   if (sfd >= 0)
     CleanupEventManager(sfd);
 
-#ifdef WINDOWS_BUILD
+#ifdef _WIN32
   WSACleanup();
 #endif
 
@@ -278,7 +278,7 @@ int main(int argc, const char *argv[]) {
   void *window = NULL;
   int cfd = -1;
 
-#ifdef WINDOWS_BUILD
+#ifdef _WIN32
   WSADATA wsaData;
 #endif
 
@@ -298,7 +298,7 @@ int main(int argc, const char *argv[]) {
     return 0;
   }
 
-#ifdef WINDOWS_BUILD
+#ifdef _WIN32
   if (WSAStartup(MAKEWORD(1, 1), &wsaData) != 0) {
     printf("Failed to initialize WinSock.\n");
     DestroyResources(NULL, NULL, -1);

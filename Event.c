@@ -19,7 +19,7 @@
 #include <string.h>
 #endif
 
-#ifdef WINDOWS_BUILD
+#ifdef _WIN32
 #include <winsock.h>
 #else
 #include <netdb.h>
@@ -33,7 +33,7 @@
  *  CleanupEventManager: Releases any resources used for event communication.
  * ========================================================================= */
 void CleanupEventManager(int sfd) {
-#ifdef WINDOWS_BUILD
+#ifdef _WIN32
   closesocket(sfd);
 #else
   close(sfd);
@@ -46,7 +46,7 @@ void CleanupEventManager(int sfd) {
 void CloseEventManagerHandle(int cfd) {
   shutdown(cfd, SHUT_RDWR);
 
-#ifdef WINDOWS_BUILD
+#ifdef _WIN32
   closesocket(cfd);
 #else
   close(cfd);
@@ -109,7 +109,7 @@ int RegisterEventManager(int port) {
       continue;
 
     if (bind(sfd, cur->ai_addr, cur->ai_addrlen) < 0) {
-#ifdef WINDOWS_BUILD
+#ifdef _WIN32
       closesocket(sfd);
 #else
       close(sfd);
@@ -117,10 +117,22 @@ int RegisterEventManager(int port) {
       continue;
     }
 
+    if (listen(sfd, 1) == -1) {
+#ifdef _WIN32
+      closesocket(sfd);
+#else
+      close(sfd);
+#endif
+
+      continue;
+    }
+
     /* If we got this far, we have bound socket. */
-    break;
+    freeaddrinfo(res);
+    return sfd;
   }
 
-  return sfd;
+  freeaddrinfo(res);
+  return -1;
 }
 
