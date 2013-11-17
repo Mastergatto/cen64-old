@@ -159,8 +159,8 @@ ParseArgs(int args, const char *argv[], struct CEN64Device *device, int *port) {
         continue;
       }
 
-      else if (num < 1 || num > 65535) {
-        printf("-port: Argument must be in range: 1..65535.\n");
+      else if (num < 0 || num > 65535) {
+        printf("-port: Argument must be in range: 0..65535.\n");
         continue;
       }
 
@@ -215,14 +215,17 @@ SignalHandler(int sig) {
  *  DestroyResources: Destroy any resources; call before exiting.
  * ========================================================================= */
 static void
-DestroyResources(struct CEN64Device *device, void *window, int sfd) {
+DestroyResources(struct CEN64Device *device, void *window, int sfd, int cfd) {
   if (device != NULL)
     DestroyDevice(device);
 
   if (window != NULL)
   DestroyWindow(window);
 
-  if (sfd != -1)
+  if (cfd >= 0)
+    CloseEventManagerHandle(cfd);
+
+  if (sfd >= 0)
     CleanupEventManager(sfd);
 
 #ifdef WINDOWS_BUILD
@@ -270,9 +273,10 @@ WindowResizeCallback(int width, int height) {
  *  main: Parses arguments and kicks off the application.
  * ========================================================================= */
 int main(int argc, const char *argv[]) {
+  int sfd = -1, port = -1;
   struct CEN64Device *device;
-  int sfd = -1, port = 0;
   void *window = NULL;
+  int cfd = -1;
 
 #ifdef WINDOWS_BUILD
   WSADATA wsaData;
@@ -284,7 +288,7 @@ int main(int argc, const char *argv[]) {
       "Options:\n"
       "  -controller [keyboard,mayflash64,retrolink,wiiu,x360]\n"
       "  -eeprom <file>\n"
-      "  -port <1..65535>\n"
+      "  -port 0, <1..65535>\n"
       "  -sram <file>\n\n",
       argv[0]);
 
@@ -310,31 +314,44 @@ int main(int argc, const char *argv[]) {
 
   if (CreateWindow(&window, false) < 0) {
     printf("Failed to open a GLFW window.\n");
-    DestroyResources(NULL, NULL, -1);
+    DestroyResources(NULL, NULL, -1, -1);
     return 2;
   }
 
   /* Parse command line arguments, build the console. */
   if ((device = CreateDevice(argv[argc - 2])) == NULL) {
     printf("Failed to create a device.\n");
-    DestroyResources(NULL, device, -1);
+    DestroyResources(NULL, window, -1, -1);
     return 3;
   }
 
   if (ParseArgs(argc - 3, argv + 1, device, &port)) {
-    DestroyResources(device, window, -1);
+    DestroyResources(device, window, -1, -1);
     return 255;
   }
 
-  if ((sfd = RegisterEventManager(port)) < 0) {
-    printf("Failed to create a socket.\n");
-    DestroyResources(device, window, -1);
-    return 4;
+  /* Establish a communication vector with frontend. */
+  /* If user doesn't want one, then just ignore this. */
+  if (port >= 0) {
+    if ((sfd = RegisterEventManager(port)) < 0 ||
+      (port = GetEventManagerPort(sfd)) < 0) {
+      printf("Failed to create a socket.\n");
+      DestroyResources(device, window, -1, -1);
+      return 4;
+    }
+
+    /* We got a port, wait for the connect. */
+    /* Limit ourselves to one client for now. */
+    printf("%d\n", port);
+
+    cfd = GetEventManagerHandle(sfd);
+    CloseEventManagerHandle(sfd);
+    sfd = -1;
   }
 
   if (LoadCartridge(device, argv[argc - 1])) {
     printf("Failed to load the ROM.\n");
-    DestroyResources(device, window, sfd);
+    DestroyResources(device, window, sfd, cfd);
     return 5;
   }
 
@@ -351,7 +368,7 @@ int main(int argc, const char *argv[]) {
   VR4300DumpStatistics(device->vr4300);
 #endif
 
-  DestroyResources(device, window, sfd);
+  DestroyResources(device, window, sfd, cfd);
   return 0;
 }
 

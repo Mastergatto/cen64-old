@@ -59,7 +59,7 @@ MKDIR=mkdir
 RM=del /q /s 1>NUL 2>NUL
 endif
 
-CEN64_FLAGS =
+CEN64_FLAGS = -D_POSIX_SOURCE
 ifeq ($(OS),windows)
 CEN64_FLAGS += -DWINDOWS_BUILD
 endif
