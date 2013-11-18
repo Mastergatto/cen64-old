@@ -8,6 +8,12 @@
  *  This file is subject to the terms and conditions defined in
  *  file 'LICENSE', which is part of this source code package.
  * ========================================================================= */
+#ifdef _WIN32
+#include <winsock2.h>
+#include <WS2tcpip.h>
+#include <winsock.h>
+#endif
+
 #ifdef __cplusplus
 #include <cstdio>
 #include <cstdlib>
@@ -18,9 +24,7 @@
 #include <string.h>
 #endif
 
-#ifdef _WIN32
-#include <winsock.h>
-#else
+#ifndef _WIN32
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <netinet/in.h>
@@ -132,11 +136,11 @@ main(int argc, const char *argv[]) {
   printf("Connection established.\n");
   loop(sfd);
 
-  shutdown(sfd, SHUT_RDWR);
 #ifdef _WIN32
   closesocket(sfd);
   WSACleanup();
 #else
+  shutdown(sfd, SHUT_RDWR);
   close(sfd);
 #endif
 
