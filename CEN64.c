@@ -105,6 +105,30 @@ static void DestroyGLWindow(void *window) {
 }
 
 /* ============================================================================
+ *  DestroyResources: Destroy any resources; call before exiting.
+ * ========================================================================= */
+static void
+DestroyResources(struct CEN64Device *device, void *window, int sfd, int cfd) {
+  if (device != NULL)
+    DestroyDevice(device);
+
+  if (window != NULL)
+  DestroyGLWindow(window);
+
+  if (cfd >= 0)
+    CloseEventManagerHandle(cfd);
+
+  if (sfd >= 0)
+    CleanupEventManager(sfd);
+
+#ifdef _WIN32
+  WSACleanup();
+#endif
+
+  glfwTerminate();
+}
+
+/* ============================================================================
  *  ParseArgs: Parses the argument list and performs actions.
  * ========================================================================= */
 static int
@@ -209,30 +233,6 @@ RunConsole(struct CEN64Device *device) {
 static void
 SignalHandler(int sig) {
   RequestShutdown();
-}
-
-/* ============================================================================
- *  DestroyResources: Destroy any resources; call before exiting.
- * ========================================================================= */
-static void
-DestroyResources(struct CEN64Device *device, void *window, int sfd, int cfd) {
-  if (device != NULL)
-    DestroyDevice(device);
-
-  if (window != NULL)
-  DestroyGLWindow(window);
-
-  if (cfd >= 0)
-    CloseEventManagerHandle(cfd);
-
-  if (sfd >= 0)
-    CleanupEventManager(sfd);
-
-#ifdef _WIN32
-  WSACleanup();
-#endif
-
-  glfwTerminate();
 }
 
 /* ============================================================================

@@ -125,7 +125,7 @@ $(TARGET): $(OBJECTS) libaudio libbus libpif \
   librdp librdram librom librsp libvideo libvr4300
 	@$(ECHO) $(BLUE)Linking$(YELLOW): $(PURPLE)$@$(TEXTRESET)
 	@$(CC) $(CFLAGS) $(LDFLAGS) $(LIBDIRS) $(OBJECTS) $(LIBS) \
-    -L. -lglfw -lopengl32 -lOpenAL32.dll -lws2_32 -o $@
+    -static-libgcc -lglfw -lopengl32 -lOpenAL32.dll -lws2_32 -o $@
 
 $(OBJECT_DIR)\\%.o: %.c %.h Common.h
 	@$(MAYBE) $(OBJECT_DIR) $(MKDIR) $(OBJECT_DIR)
