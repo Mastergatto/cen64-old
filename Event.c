@@ -8,6 +8,8 @@
  *  This file is subject to the terms and conditions defined in
  *  file 'LICENSE', which is part of this source code package.
  * ========================================================================= */
+#define _POSIX_C_SOURCE 200112L
+
 #ifdef _WIN32
 #include <winsock2.h>
 #include <WS2tcpip.h>
